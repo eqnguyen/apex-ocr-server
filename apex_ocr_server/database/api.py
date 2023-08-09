@@ -7,6 +7,7 @@ from apex_ocr_server.database.models import (
     MatchType,
     Player,
     PlayerMatchResult,
+    Season,
 )
 from sqlalchemy import create_engine
 from sqlalchemy.exc import DataError, IntegrityError
@@ -40,9 +41,19 @@ class ApexDatabaseApi:
 
     def push_results(self, results: dict) -> None:
         # TODO: Handle different match types
+
+        # Get season
+        season = None
+        dt = results["Datetime"]
+        for season in self.session.query(Season).all():
+            if dt >= season.start_date:
+                if not season.end_date or dt <= season.end_date:
+                    break
+
         # Commit match result
         match_result = MatchResult(
-            datetime=results["Datetime"],
+            datetime=dt,
+            season=season.id if season is not None else None,
             match_type=MatchType.BATTLE_ROYALE,
             place=results["Place"],
             hash=results["Hash"],
