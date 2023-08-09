@@ -1,5 +1,7 @@
 import logging
+from pathlib import Path
 
+import yaml
 from apex_ocr.utils import time_survived_to_seconds
 from apex_ocr_server.database.models import (
     Clan,
@@ -17,7 +19,26 @@ logger = logging.getLogger(__name__)
 
 
 class ApexDatabaseApi:
-    def __init__(self, db_conn_str) -> None:
+    def __init__(self, db_conn_str: str = None, config: Path = None) -> None:
+        if db_conn_str is not None:
+            pass
+        elif config is not None and config.exists():
+            with open(config) as db_file:
+                db_config = yaml.load(db_file, Loader=yaml.FullLoader)
+
+            dialect = db_config["dialect"]
+            username = db_config["username"]
+            password = db_config["password"]
+            hostname = db_config["hostname"]
+            port = db_config["port"]
+            database_name = db_config["database_name"]
+
+            db_conn_str = (
+                f"{dialect}://{username}:{password}@{hostname}:{port}/{database_name}"
+            )
+        else:
+            logger.exception("Invalid arguments to ApexDatabaseApi")
+
         self.engine = create_engine(db_conn_str)
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
