@@ -29,3 +29,7 @@ If you want to drop everything from the database and start over, you can run the
 alembic downgrade -1
 alembic upgrade head
 ```
+
+### Schema
+
+![database](./docs/database_schema.jpg)
