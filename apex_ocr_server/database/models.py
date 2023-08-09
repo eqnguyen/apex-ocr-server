@@ -114,6 +114,14 @@ class PlayerMatchResult(Base, BaseMixin):
     player = relationship("Player", back_populates="match_results")
     match_result = relationship("MatchResult", back_populates="player_match_results")
 
+    @classmethod
+    def get_by_player_name(cls, session, name):
+        return session.query(cls).join(Player).filter(Player.name == name).all()
+
+    @classmethod
+    def get_by_clan_tag(cls, session, tag):
+        return session.query(cls).join(Player).join(Clan).filter(Clan.tag == tag).all()
+
     def __repr__(self):
         return (
             f"PlayerMatchResult(id={self.id}, match_result=MatchResult(id={self.match_result.id}, "
@@ -183,3 +191,7 @@ class MatchResult(Base, BaseMixin):
         cascade="all, delete",
         passive_deletes=True,
     )
+
+    @classmethod
+    def get_by_season(cls, session, season):
+        return session.query(cls).join(Season).filter(Season.number == season).all()
