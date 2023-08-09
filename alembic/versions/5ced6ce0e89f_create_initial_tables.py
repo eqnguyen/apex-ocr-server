@@ -104,7 +104,7 @@ class MatchResult(Base):
     __tablename__ = "match_result"
 
     id = Column(Integer, primary_key=True)
-    season = Column(ForeignKey("season.id", ondelete="SET NULL"))
+    season_id = Column(ForeignKey("season.id", ondelete="SET NULL"))
     datetime = Column(DateTime(timezone=True), nullable=False)
     match_type = Column(Enum(MatchType), nullable=False)
     place = Column(Integer)
@@ -120,6 +120,7 @@ def upgrade() -> None:
         """
     CREATE VIEW full_match_results AS
     SELECT mr.id,
+        s.number AS season,
         mr.datetime,
         mr.match_type,
         mr.place,
@@ -153,6 +154,7 @@ def upgrade() -> None:
         pmr3.revives AS p3_revives,
         pmr3.respawns AS p3_respawns
     FROM match_result mr
+    JOIN season s ON s.id = mr.season_id
     JOIN player_match_result pmr1 ON pmr1.match_id = mr.id
     JOIN player p1 ON p1.id = pmr1.player_id
     JOIN player_match_result pmr2 ON pmr1.match_id = pmr2.match_id AND pmr1.id < pmr2.id

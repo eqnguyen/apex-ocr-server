@@ -168,7 +168,7 @@ class MatchResult(Base, BaseMixin):
     __tablename__ = "match_result"
 
     id = Column(Integer, primary_key=True)
-    season = Column(ForeignKey("season.id", ondelete="SET NULL"))
+    season_id = Column(ForeignKey("season.id", ondelete="SET NULL"))
     datetime = Column(DateTime(timezone=True), nullable=False)
     match_type = Column(Enum(MatchType), nullable=False)
     place = Column(Integer)
