@@ -117,8 +117,9 @@ class PlayerMatchResult(Base, BaseMixin):
     def __repr__(self):
         return (
             f"PlayerMatchResult(id={self.id}, match_result=MatchResult(id={self.match_result.id}, "
-            f"datetime={self.match_result.datetime}, match_type={self.match_result.match_type}, "
-            f"place={self.match_result.place}, result={self.match_result.result}, hash={self.match_result.hash}), "
+            f"season={self.match_result.season.number}, datetime={self.match_result.datetime}, "
+            f"match_type={self.match_result.match_type}, place={self.match_result.place}, "
+            f"result={self.match_result.result}, hash={self.match_result.hash}), "
             f"player=Player(id={self.player_id}, clan_id={self.player.clan_id}, name={self.player.name}), "
             f"legend={self.legend}, kills={self.kills}, assists={self.assists}, "
             f"knockdowns={self.knockdowns}, damage={self.damage}, survival_time={self.survival_time}, "
@@ -129,6 +130,7 @@ class PlayerMatchResult(Base, BaseMixin):
         return {
             "id": self.id,
             "match_id": self.match_result.id,
+            "season": self.match_result.season.number,
             "datetime": self.match_result.datetime,
             "match_type": self.match_result.match_type,
             "place": self.match_result.place,
@@ -150,7 +152,7 @@ class PlayerMatchResult(Base, BaseMixin):
 
 class Season(Base, BaseMixin):
     __tablename__ = "season"
-    
+
     id = Column(Integer, primary_key=True)
     number = Column(Integer, unique=True)
     name = Column(String, unique=True)
@@ -168,13 +170,14 @@ class MatchResult(Base, BaseMixin):
     __tablename__ = "match_result"
 
     id = Column(Integer, primary_key=True)
-    season_id = Column(ForeignKey("season.id", ondelete="SET NULL"))
+    season_id = Column(ForeignKey("season.id", ondelete="SET NULL"), nullable=False)
     datetime = Column(DateTime(timezone=True), nullable=False)
     match_type = Column(Enum(MatchType), nullable=False)
     place = Column(Integer)
     result = Column(Enum(WinLoss))
     hash = Column(String, unique=True, nullable=False)
 
+    season = relationship("Season", back_populates="match_results")
     player_match_results = relationship(
         "PlayerMatchResult",
         cascade="all, delete",
