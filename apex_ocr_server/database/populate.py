@@ -1,143 +1,96 @@
-from datetime import date
+import re
+from datetime import datetime
 
-import yaml
+import click
+import fandom
 from apex_ocr_server.config import DATABASE_YML_FILE
 from apex_ocr_server.database.api import ApexDatabaseApi
-from apex_ocr_server.database.models import Season
+from apex_ocr_server.database.models import Patch, Season
+from bs4 import BeautifulSoup
+from tqdm import tqdm
 
 
-def populate_db():
-    with open(DATABASE_YML_FILE) as db_file:
-        db_config = yaml.load(db_file, Loader=yaml.FullLoader)
+@click.command()
+@click.option("--seasons", is_flag=True, help="Populate database with Apex seasons")
+@click.option("--patches", is_flag=True, help="Populate database with Apex patches")
+def populate_db(seasons: bool, patches: bool):
+    db_conn = ApexDatabaseApi(config=DATABASE_YML_FILE)
 
-    dialect = db_config["dialect"]
-    username = db_config["username"]
-    password = db_config["password"]
-    hostname = db_config["hostname"]
-    port = db_config["port"]
-    database_name = db_config["database_name"]
+    fandom.set_wiki("apexlegends")
 
-    db_conn_str = f"{dialect}://{username}:{password}@{hostname}:{port}/{database_name}"
+    # Parse fandom Wiki for season information
+    if seasons:
+        season_page_query = fandom.search("Season", results=1)[0]
+        season_page = fandom.page(pageid=season_page_query[1])
+        season_content = season_page.content["sections"][0]["content"].split("\n")
+        season_strings = [
+            f"{season_content[i-1]}: {s}"
+            for i, s in enumerate(season_content)
+            if "days)" in s
+        ]
 
-    db_conn = ApexDatabaseApi(db_conn_str)
+        season_entries = []
+        date_format = "%b %d, %Y"
 
-    seasons = [
-        Season(
-            number=0,
-            name="Preseason",
-            start_date=date(2019, 2, 4),
-            end_date=date(2019, 3, 19),
-        ),
-        Season(
-            number=1,
-            name="Wild Frontier",
-            start_date=date(2019, 3, 19),
-            end_date=date(2019, 7, 2),
-        ),
-        Season(
-            number=2,
-            name="Battle Charge",
-            start_date=date(2019, 7, 2),
-            end_date=date(2019, 10, 1),
-        ),
-        Season(
-            number=3,
-            name="Meltdown",
-            start_date=date(2019, 10, 1),
-            end_date=date(2020, 2, 4),
-        ),
-        Season(
-            number=4,
-            name="Assimilation",
-            start_date=date(2020, 2, 4),
-            end_date=date(2020, 5, 12),
-        ),
-        Season(
-            number=5,
-            name="Fortune's Favor",
-            start_date=date(2020, 5, 12),
-            end_date=date(2020, 8, 18),
-        ),
-        Season(
-            number=6,
-            name="Boosted",
-            start_date=date(2020, 8, 18),
-            end_date=date(2020, 11, 4),
-        ),
-        Season(
-            number=7,
-            name="Ascension",
-            start_date=date(2020, 11, 4),
-            end_date=date(2021, 2, 2),
-        ),
-        Season(
-            number=8,
-            name="Mayhem",
-            start_date=date(2021, 2, 2),
-            end_date=date(2021, 5, 4),
-        ),
-        Season(
-            number=9,
-            name="Legacy",
-            start_date=date(2021, 5, 4),
-            end_date=date(2021, 8, 3),
-        ),
-        Season(
-            number=10,
-            name="Emergence",
-            start_date=date(2021, 8, 3),
-            end_date=date(2021, 11, 2),
-        ),
-        Season(
-            number=11,
-            name="Escape",
-            start_date=date(2021, 11, 2),
-            end_date=date(2022, 2, 8),
-        ),
-        Season(
-            number=12,
-            name="Defiance",
-            start_date=date(2022, 2, 8),
-            end_date=date(2022, 5, 10),
-        ),
-        Season(
-            number=13,
-            name="Saviors",
-            start_date=date(2022, 5, 10),
-            end_date=date(2022, 8, 9),
-        ),
-        Season(
-            number=14,
-            name="Hunted",
-            start_date=date(2022, 8, 9),
-            end_date=date(2022, 11, 1),
-        ),
-        Season(
-            number=15,
-            name="Eclipse",
-            start_date=date(2022, 11, 1),
-            end_date=date(2023, 2, 14),
-        ),
-        Season(
-            number=16,
-            name="Revelry",
-            start_date=date(2023, 2, 14),
-            end_date=date(2023, 5, 16),
-        ),
-        Season(
-            number=17,
-            name="Arsenal",
-            start_date=date(2023, 5, 16),
-            end_date=date(2023, 8, 8),
-        ),
-        Season(
-            number=18,
-            name="Resurrection",
-            start_date=date(2023, 8, 8),
-        ),
-    ]
+        for season_str in tqdm(season_strings, desc="Seasons"):
+            name_number_str, date_str = season_str.split(":", 1)
+            name = name_number_str.split("(", 1)[0]
+            match = re.search(r"\d+", name_number_str)
+            if match:
+                number = int(match.group())
+            else:
+                number = 0
+            date_str = date_str.replace(".", "")
+            start_date = datetime.strptime(
+                date_str.split(" - ")[0].strip(), date_format
+            ).date()
+            end_date = datetime.strptime(
+                date_str.split(" - ")[1].split("(", 1)[0], date_format
+            ).date()
 
-    db_conn.add_all(seasons)
+            season_entries.append(
+                Season(
+                    number=number, name=name, start_date=start_date, end_date=end_date
+                )
+            )
+
+        db_conn.add_all(season_entries)
+
+    # Parse fandom Wiki for patch information
+    if patches:
+        version_page_query = fandom.search("Version_History", results=1)[0]
+        version_page = fandom.page(pageid=version_page_query[1])
+
+        patch_entries = []
+        date_format = "%B %d, %Y"
+
+        for yearly_patches in tqdm(
+            version_page.content["sections"][0]["sections"], desc="Patch years"
+        ):
+            for line in tqdm(
+                yearly_patches["content"].split("\n"), desc=yearly_patches["title"]
+            ):
+                if "Patches" in line:
+                    continue
+
+                if "Patch" in (line):
+                    page_title = line.split("Patch", 1)[0].strip()
+                    date = datetime.strptime(page_title, date_format).date()
+                    patch_page_query = fandom.search(page_title, results=1)[0]
+                    patch_page = fandom.page(pageid=patch_page_query[1])
+                    soup = BeautifulSoup(patch_page.html, "html.parser")
+                    tables = soup.find_all("table")
+
+                    for table in tables:
+                        rows = table.find_all("tr")
+                        for row in rows:
+                            cells = row.find_all(["th", "td"])
+                            row_data = [cell.get_text(strip=True) for cell in cells]
+                            if "Version number" in row_data:
+                                version = row_data[1]
+                                patch_entries.append(Patch(version=version, date=date))
+
+        db_conn.add_all(patch_entries)
 
 
 if __name__ == "__main__":

@@ -2,3 +2,4 @@ apex-ocr
 alembic
 gradio==3.27.0
 gradio_client==0.1.3
+fandom-py
