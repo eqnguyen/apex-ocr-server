@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, Enum, ForeignKey, Integer, String, DateTime
+from sqlalchemy import Column, Enum, ForeignKey, Integer, String, DateTime, Date
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -125,9 +125,8 @@ class PlayerMatchResult(Base, BaseMixin):
     def __repr__(self):
         return (
             f"PlayerMatchResult(id={self.id}, match_result=MatchResult(id={self.match_result.id}, "
-            f"season={self.match_result.season.number}, datetime={self.match_result.datetime}, "
-            f"match_type={self.match_result.match_type}, place={self.match_result.place}, "
-            f"result={self.match_result.result}, hash={self.match_result.hash}), "
+            f"datetime={self.match_result.datetime}, match_type={self.match_result.match_type}, "
+            f"place={self.match_result.place}, result={self.match_result.result}, hash={self.match_result.hash}), "
             f"player=Player(id={self.player_id}, clan_id={self.player.clan_id}, name={self.player.name}), "
             f"legend={self.legend}, kills={self.kills}, assists={self.assists}, "
             f"knockdowns={self.knockdowns}, damage={self.damage}, survival_time={self.survival_time}, "
@@ -138,7 +137,6 @@ class PlayerMatchResult(Base, BaseMixin):
         return {
             "id": self.id,
             "match_id": self.match_result.id,
-            "season": self.match_result.season.number,
             "datetime": self.match_result.datetime,
             "match_type": self.match_result.match_type,
             "place": self.match_result.place,
@@ -164,28 +162,20 @@ class Season(Base, BaseMixin):
     id = Column(Integer, primary_key=True)
     number = Column(Integer, unique=True)
     name = Column(String, unique=True)
-    start_date = Column(DateTime(timezone=True))
-    end_date = Column(DateTime(timezone=True))
-
-    match_results = relationship(
-        "MatchResult",
-        cascade="all, delete",
-        passive_deletes=True,
-    )
+    start_date = Column(Date)
+    end_date = Column(Date)
 
 
 class MatchResult(Base, BaseMixin):
     __tablename__ = "match_result"
 
     id = Column(Integer, primary_key=True)
-    season_id = Column(ForeignKey("season.id", ondelete="SET NULL"), nullable=False)
     datetime = Column(DateTime(timezone=True), nullable=False)
     match_type = Column(Enum(MatchType), nullable=False)
     place = Column(Integer)
     result = Column(Enum(WinLoss))
     hash = Column(String, unique=True, nullable=False)
 
-    season = relationship("Season", back_populates="match_results")
     player_match_results = relationship(
         "PlayerMatchResult",
         cascade="all, delete",
@@ -193,5 +183,18 @@ class MatchResult(Base, BaseMixin):
     )
 
     @classmethod
-    def get_by_season(cls, session, season):
-        return session.query(cls).join(Season).filter(Season.number == season).all()
+    def get_by_season(cls, session, season_number):
+        season = session.query(Season).filter(Season.number == season_number).first()
+        return (
+            session.query(cls)
+            .filter(cls.datetime >= season.start_date, cls.datetime <= season.end_date)
+            .all()
+        )
+
+
+class Patch(Base, BaseMixin):
+    __tablename__ = "patch"
+
+    id = Column(Integer, primary_key=True)
+    version = Column(String)
+    date = Column(Date)

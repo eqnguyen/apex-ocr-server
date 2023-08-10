@@ -7,9 +7,8 @@ Create Date: 2023-08-07 02:01:01.314371
 """
 import enum
 
-import sqlalchemy as sa
 from alembic import op
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import declarative_base
 
 # revision identifiers, used by Alembic.
@@ -96,20 +95,27 @@ class Season(Base):
     id = Column(Integer, primary_key=True)
     number = Column(Integer, unique=True)
     name = Column(String, unique=True)
-    start_date = Column(DateTime(timezone=True))
-    end_date = Column(DateTime(timezone=True))
+    start_date = Column(Date)
+    end_date = Column(Date)
 
 
 class MatchResult(Base):
     __tablename__ = "match_result"
 
     id = Column(Integer, primary_key=True)
-    season_id = Column(ForeignKey("season.id", ondelete="SET NULL"))
     datetime = Column(DateTime(timezone=True), nullable=False)
     match_type = Column(Enum(MatchType), nullable=False)
     place = Column(Integer)
     result = Column(Enum(WinLoss))
     hash = Column(String, unique=True, nullable=False)
+
+
+class Patch(Base):
+    __tablename__ = "patch"
+
+    id = Column(Integer, primary_key=True)
+    version = Column(String)
+    date = Column(Date)
 
 
 def upgrade() -> None:
@@ -120,7 +126,6 @@ def upgrade() -> None:
         """
     CREATE VIEW full_match_results AS
     SELECT mr.id,
-        s.number AS season,
         mr.datetime,
         mr.match_type,
         mr.place,
@@ -154,7 +159,6 @@ def upgrade() -> None:
         pmr3.revives AS p3_revives,
         pmr3.respawns AS p3_respawns
     FROM match_result mr
-    JOIN season s ON s.id = mr.season_id
     JOIN player_match_result pmr1 ON pmr1.match_id = mr.id
     JOIN player p1 ON p1.id = pmr1.player_id
     JOIN player_match_result pmr2 ON pmr1.match_id = pmr2.match_id AND pmr1.id < pmr2.id
